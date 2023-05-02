@@ -1,6 +1,9 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 import sqlite3
+import bcrypt
 from flask_cors import cross_origin, CORS
+import uuid
+
 app = Flask(__name__)
 CORS(app, resources={r'*': {'origins': '*'}})
 
@@ -19,13 +22,45 @@ def insert_property(property):
 def insert_user(user):
     conn = sqlite3.connect('landd.db')
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO userr(u_name, u_address, u_phone) VALUES (?, ?, ?)", (user['name'], user['address'], int(user['phone'])))
+    user_id = uuid.uuid1()
+   
+    password=user['password'].encode('utf-8')
+    hashed = bcrypt.hashpw(password, bcrypt.gensalt(10))
+    print("USER ID TYPE ====>", type(user_id.hex))
+    cursor.execute("INSERT INTO user(user_id, email_id, password, fname, lname, phone, address, city, state, pincode, user_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (user_id.hex , user['email_id'], hashed, user['fname'], user['lname'],int(user['phone']), user['address'], user['city'], user['state'], int(user['pincode']), user['user_type']))
+    print("SUCCESSFULLY")
     conn.commit()
     conn.close()
     conn.close()
     return jsonify({'message': 'User created successfully'})
 
 #----------READ/DISPLAY---------------
+
+def validate_user(login_data):
+    conn = sqlite3.connect('landd.db')
+    cursor = conn.cursor()
+    u_name= login_data["u_name"]
+    u_password = login_data["u_password"]
+    print("data11------>", u_name, u_password)
+    try:
+        cursor.execute("SELECT * FROM userr WHERE u_name = ?", (u_name,))
+        data=cursor.fetchone()
+        u_id=data[0]
+        name=data[1]
+        pwd=data[4]
+        # print("dataaa==========>", name, pwd)
+        password = u_password.encode('utf-8')
+        if bcrypt.checkpw(password, pwd):
+            conn.commit()
+            conn.close()
+            return {'u_name': name, 'u_id': str(u_id)}
+        else:
+            conn.commit()
+            conn.close()
+            return {}
+    except:
+        return {}
+     
 
 def list_users():
     conn = sqlite3.connect('landd.db')
@@ -77,8 +112,25 @@ def list_properties():
 def update_user(user):
     conn = sqlite3.connect('landd.db')
     cursor = conn.cursor()
-    cursor.execute("UPDATE userr SET u_name = ?, u_address = ?, u_phone = ? WHERE u_id =?",(user["name"], 
-                                                                                            user["address"], int(user["phone"]), int(user["u_id"]),))
+    pwd=user["pwd"]
+    password=pwd.encode('utf-8')
+    hashed = bcrypt.hashpw(password, bcrypt.gensalt(10))
+    cursor.execute("UPDATE userr SET u_pwd=? WHERE u_id =?",(hashed, int(user["u_id"]),))
+    conn.commit()
+    # demo="sunny"
+    # check = demo.encode('utf-8') 
+    # if bcrypt.checkpw(check, hashed):
+    #     print("pwd ======> login success")
+    # else:
+    #     print("pwd ======> incorrect password")
+    conn.close()
+
+    return jsonify({'message': 'User updated successfully'})
+
+def update_property(property):
+    conn = sqlite3.connect('landd.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE property SET status=? WHERE p_id =?",(property["status"], int(property["p_id"]),))
     conn.commit()
     conn.close()
 
@@ -89,7 +141,7 @@ def update_user(user):
 def delete_user(user_id):
     message = {}
     conn = sqlite3.connect('landd.db')
-    conn.execute("DELETE from userr WHERE u_id = ?",(user_id))
+    conn.execute("DELETE * from user WHERE u_id = ?",(user_id))
     conn.commit()
     message["status"] = "User deleted successfully"
    
@@ -132,11 +184,28 @@ def get_users():
     msg=list_users()
     return jsonify(msg)
 
+@app.route('/login', methods=['POST'])
+def get_login_data():
+    login_data=request.get_json()
+    msg = validate_user(login_data)
+    print("message ==>", msg)
+    if msg=={}:
+        return jsonify({'success': False, 'error': True, 'message': "username or password is incorrect", 'data': {}})
+    else:
+        return jsonify({'success': True, 'data': msg, 'error': False, 'message': "user logged in successfully"})
+
 
 @app.route('/showproperties', methods=['GET'])
 def get_properties():
     msg=list_properties()
     return jsonify(msg)
+
+@app.route('/updateproperty',  methods = ['PUT'])
+def update_properties():
+    property = request.get_json()
+    msg=update_property(property)
+    print(msg)
+    return jsonify({'message': 'User updated successfully'})
 
 @app.route('/updateusers',  methods = ['PUT'])
 def update_userr():
@@ -158,23 +227,5 @@ if __name__ == '__main__':
     app.run()
 
 
-# def list_user_by_id(u_id):
-#     conn = sqlite3.connect('landd.db')
-#     cursor = conn.cursor()
-#     cursor.execute("SELECT * FROM userr WHERE u_id = ?", (u_id))
-#     data=cursor.fetchone()
-#     user={}
-#     user["user_id"] = str(data[0])
-#     user["name"] = data[1]
-#     user["address"] = data[2]
-#     user["phone"] = str(data[3])
 
-#     conn.commit()
-#     conn.close()
-#     return jsonify(user) 
 
-# @app.route('/showusersid/<user_id>', methods=['GET'])
-# def get_user(user_id):
-#     msg=list_user_by_id(user_id)
-#     print(msg)
-#     return jsonify(msg)
