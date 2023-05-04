@@ -32,7 +32,7 @@ def insert_user(user):
     conn.commit()
     conn.close()
     conn.close()
-    return jsonify({'message': 'User created successfully'})
+    return {'message': 'User created successfully', 'user_id': str(user_id)}
 
 #----------READ/DISPLAY---------------
 
@@ -43,11 +43,11 @@ def validate_user(login_data):
     u_password = login_data["u_password"]
     print("data11------>", u_name, u_password)
     try:
-        cursor.execute("SELECT * FROM userr WHERE u_name = ?", (u_name,))
+        cursor.execute("SELECT * FROM user WHERE fname = ?", (u_name,))
         data=cursor.fetchone()
         u_id=data[0]
-        name=data[1]
-        pwd=data[4]
+        name=data[3]
+        pwd=data[2]
         # print("dataaa==========>", name, pwd)
         password = u_password.encode('utf-8')
         if bcrypt.checkpw(password, pwd):
@@ -168,7 +168,8 @@ def add_user():
     print(user)
     msg=insert_user(user)
     print(msg)
-    return jsonify({'message': 'User created successfully'})
+    print("USER_ID ==>",msg['user_id'])
+    return jsonify({'status': 'User created successfully', 'message': msg['user_id']})
 
 @app.route('/addproperty', methods = ['POST'])
 def add_property():
